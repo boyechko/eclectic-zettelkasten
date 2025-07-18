@@ -674,16 +674,23 @@ the text instead."
   :group 'ezeka
   :type 'boolean)
 
-(defun ezeka--make-help-echo-overlay (match-data)
-  "Make a help-echo overlay for Zettel ID based on MATCH-DATA."
+;; When added to `ezeka-insert-link-hook', the function creates the help echo
+;; overlay for newly inserted links:
+;;
+;;   (add-hook 'ezeka-insert-link-hook 'ezeka-make-help-echo-overlay-at-pos)
+(defun ezeka-make-help-echo-overlay-at-pos (&optional pos)
+  "Make a help-echo overlay for the link at POS (or `point')."
   (save-match-data
-    (set-match-data match-data)
-    (when-let* ((file (ignore-errors
-                        (ezeka-link-file (match-string-no-properties 1))))
-                (overlay (make-overlay (match-beginning 1) (match-end 1))))
-      (overlay-put overlay 'type 'ezeka-help-echo)
-      (overlay-put overlay 'face '(:underline "purple"))
-      (overlay-put overlay 'help-echo (file-name-base file)))))
+    (save-excursion
+      (goto-char (or pos (point)))
+      (when-let* ((_ (or (thing-at-point-looking-at (ezeka-link-regexp))
+                         (and (backward-to-word 1)
+                              (thing-at-point-looking-at (ezeka-link-regexp)))))
+                  (file (ezeka-link-file (match-string 1)))
+                  (overlay (make-overlay (match-beginning 1) (match-end 1))))
+        (overlay-put overlay 'type 'ezeka-help-echo)
+        (overlay-put overlay 'face '(:underline "purple"))
+        (overlay-put overlay 'help-echo (file-name-base file))))))
 
 (defun ezeka--make-help-echo-overlays (&optional buffer)
   "Make help echo overlays in BUFFER (or `current-buffer')."
@@ -698,6 +705,18 @@ the text instead."
         (when ezeka-make-help-echo-overlays
           (while (re-search-forward overlayable nil t)
             (ezeka--make-help-echo-overlay (match-data))))))))
+
+(defun ezeka--make-help-echo-overlay (match-data)
+  "Make a help-echo overlay for Zettel ID based on MATCH-DATA.
+This is a helper function used by `ezeka--make-help-echo-overlays'."
+  (save-match-data
+    (set-match-data match-data)
+    (when-let* ((file (ignore-errors
+                        (ezeka-link-file (match-string-no-properties 1))))
+                (overlay (make-overlay (match-beginning 1) (match-end 1))))
+      (overlay-put overlay 'type 'ezeka-help-echo)
+      (overlay-put overlay 'face '(:underline "purple"))
+      (overlay-put overlay 'help-echo (file-name-base file)))))
 
 ;;;=============================================================================
 ;;; Genealogical
