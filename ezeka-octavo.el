@@ -48,23 +48,6 @@
      ,@body))
 (put 'cmd-named 'lisp-indent-function 1)
 
-(defmacro ezeka-octavo-with-kasten (kasten &rest body)
-  "Lexically bind variables for executing BODY in KASTEN."
-  (declare (indent 1))
-  (let ((eka (gensym)))
-    `(let* ((,eka (ezeka-kasten ,kasten))
-            (octavo-directory (ezeka-kasten-directory ,eka))
-            (octavo-id-regexp (ezeka--id-regexp)))
-       (cl-progv '(octavo-id-time-string-format
-                   octavo-file-name-id-only)
-           (if (eq (ezeka-kasten-id-type ,eka) :numerus)
-               '(,(concat (string (seq-random-elt (number-sequence ?a ?z)))
-                          "-%H%M")
-                 nil)
-             '("%Y%m%dT%H%M"
-               t))
-         ,@body))))
-
 (defun ezeka-octavo-initialize-kasten (name)
   "Set necessary variables for long-term work in Kasten with given NAME."
   (let ((kasten (ezeka-kasten name)))
@@ -187,47 +170,6 @@ return nil if FORMAT cannot be rendered from ID and TITLE."
             (ezeka-format-metadata format mdata))
         (unless noerror
           (error "Cannot retrieve metadata for `%s'" id))))))
-
-(defun ezeka-octavo-parse-file (target files)
-  "Parse FILES for TARGET.
-See `octavo-parse-file-function'."
-  (let* ((files (if (listp files)
-                    files
-                  (list files)))
-         (return
-          (mapcar
-           (lambda (file)
-             (if (equal target 'id)
-                 (ezeka-file-name-id file)
-               (alist-get 'title (ezeka-file-metadata file))))
-           files)))
-    (if (eq 1 (length return))
-        (car return)
-      return)))
-
-(defvar ezeka-octavo-metadata-alist nil
-  "An alist of file metadata and mtime, cached by ID.
-Each item has the form (ID TITLE FILENAME MTIME METADATA).")
-
-(defun ezeka-octavo-cache-update-all ()
-  "Update file list and update cached information for each file.
-Return `ezeka-octavo-metadata-alist'."
-  (setq ezeka-octavo-metadata-alist
-    (mapcar
-     (lambda (file)
-       (when (ezeka-file-p file)
-         (let ((metadata (ezeka-file-metadata file)))
-           (list (ezeka-file-name-id file)
-                 (alist-get 'title metadata)
-                 file
-                 (file-attribute-modification-time (file-attributes file))
-                 metadata))))
-     (ezeka--directory-files))))
-
-(defun ezeka-octavo-alist ()
-  "See `octavo-alist-function'."
-  (or ezeka-octavo-metadata-alist
-      (ezeka-octavo-cache-update-all)))
 
 ;;;=============================================================================
 ;;; Mapping Across Octavo-Index Buttons
@@ -376,19 +318,6 @@ destination kasten."
 ;;; Selecting notes
 ;;;=============================================================================
 
-(defun ezeka-octavo-insert-link (file)
-  "Wrapper around `ezeka-insert-link-with-metadata' for FILE."
-  (interactive (list (octavo--select-file "Insert link to: ")))
-  (when-let ((link (ezeka-file-link file)))
-    (if octavo-link-and-title
-        (ezeka-insert-link-with-metadata
-         link
-         (list (if (eq octavo-link-and-title 'ask)
-                   (ezeka--read-metadata-field)
-                 'title))
-         :before)
-      (ezeka--insert-link-with-spaces link))))
-
 (eval-after-load 'vertico
   (defun ezeka-octavo--setup-vertico ()
     "Define `vertico-sort-history-alpha' sort if not already defined."
@@ -499,23 +428,6 @@ SORT is the function that vertico uses to sort the results."
 ;;;=============================================================================
 ;;; Maintenance
 ;;;=============================================================================
-
-(defun ezeka-rgrep-link-at-point (link)
-  "Execute recursive grep for the ezeka LINK at point."
-  (interactive
-   (list (when (ezeka-link-at-point-p t)
-           (ezeka-link-at-point))))
-  (consult-grep ezeka-directory link))
-
-(defun ezeka-octavo-grep-in-zettelkasten (string &optional literal)
-  "Run recursive grep (`rgrep') for the given STRING across all Zettel.
-If LITERAL is non-nil, search for STRING literallyl."
-  (interactive "sSearch for what? ")
-  (grep-compute-defaults)
-  (let ((octavo-directory ezeka-directory))
-    (octavo--grep-file-list (if literal
-                            (regexp-quote string)
-                          (string-replace " " ".*" string)))))
 
 (defvar ezeka--octavo-replace-links-before-history nil
   "History variable used in `ezeka-octavo-replace-links'.")
@@ -696,96 +608,6 @@ given, suggest the note's successor, if set. METHOD overrides
   (let ((id (with-current-buffer octavo-index-buffer-name
               (octavo-index--button-at-point))))
     (ezeka-insert-link-with-metadata id '(title) :before t)))
-
-;;;=============================================================================
-;;; Entitle
-;;;=============================================================================
-
-;; FIXME: This duplicates some functionality of `ezeka-find-link'
-(defun ezeka-link-entitled-file (link title)
-  "Return a full file path to the Zettel LINK with the given TITLE."
-  (if (ezeka-link-p link)
-      (let ((kasten (ezeka-kasten (ezeka-link-kasten link)))
-            (id (ezeka-link-id link)))
-        (expand-file-name
-         (ezeka--normalize-title-into-caption
-          (format "%s%s%s.%s"
-                  id
-                  ezeka-file-name-separator
-                  title
-                  ezeka-file-extension))
-         (expand-file-name (or (ezeka-id-subdirectory id)
-                               (unless noerror
-                                 (error "Link not valid: %s" link)))
-                           (ezeka-kasten-directory kasten))))
-    (unless noerror
-      (error "This is not a proper Zettel link: %s" link))))
-
-;; FIXME: Temporary
-(defun your-read-lines (file n)
-  "Return first N lines of FILE."
-  (with-temp-buffer
-    (insert-file-contents-literally file)
-    (cl-loop repeat n
-             unless (eobp)
-             collect (prog1 (buffer-substring-no-properties
-                             (line-beginning-position)
-                             (line-end-position))
-                       (forward-line 1)))))
-
-(defun ezeka-entitle-file-name (file &optional arg prompt)
-  "Rename FILE to include caption in the file name.
-*Without* \\[universal-argument] ARG, edit the resulting file name
-before renaming If given, use the custom PROMPT."
-  (interactive (list buffer-file-name
-                     current-prefix-arg))
-  (let* ((link (ezeka-file-link file))
-         (metadata (ezeka-file-metadata file))
-         (rubric (ezeka-encode-rubric metadata))
-         (title (cl-subseq rubric
-                           (1+
-                            (cl-position (string-to-char ezeka-file-name-separator)
-                                         rubric))))
-         (entitled (ezeka-link-entitled-file link title)))
-    (let ((buf (find-file file))
-          (newname (if arg
-                       (file-name-base entitled)
-                     (read-string (or prompt "New file name: ")
-                                  (if (ezeka-file-name-title file)
-                                      (file-name-base file)
-                                    (file-name-base entitled))
-                                  (file-name-base entitled)))))
-      (cond ((string-empty-p newname)
-             (message "Empty name; not renaming"))
-            ((not (ezeka-file-name-valid-p newname))
-             (user-error "New file name is not valid: %s" newname))
-            (t
-             (ezeka--rename-file
-              file
-              (expand-file-name
-               (file-name-with-extension newname (file-name-extension entitled))
-               (file-name-directory entitled)))))
-      (when arg
-        (kill-buffer-if-not-modified buf)))))
-
-;;;=============================================================================
-;;; Utility
-;;;=============================================================================
-
-(defun ezeka-octavo-file-id (file)
-  "Return the ID of the given FILE."
-  (when (string-match (octavo-file-name-regexp) file)
-    (match-string-no-properties 1 file)))
-
-(defun ezeka-octavo-file-title (file)
-  "Return the TITLE of the given FILE."
-  (when (string-match (octavo-file-name-regexp) file)
-    (let ((id (match-string-no-properties 1 file))
-          (title (match-string-no-properties 2 file)))
-      (if (string= "." title)
-          (or (alist-get 'title (ezeka-file-metadata file t))
-              "<no title>")
-        title))))
 
 (provide 'ezeka-octavo)
 ;;; ezeka-octavo.el ends here
