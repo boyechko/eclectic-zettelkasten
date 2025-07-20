@@ -100,7 +100,7 @@ is non-nil (or \\[universal-argument] \\[universal-argument]), don't actually sw
       (= prefix 4)
       (= prefix 16))))
   (custom-set-variables
-   '(octavo-subdirectory-function #'ezeka-id-subdirectory)
+   `(octavo-subdirectory-function ,(ezeka-kasten-subdir-func (ezeka-kasten kasten)))
    `(octavo-index-buffer-name ,(ezeka-octavo--index-buffer-name kasten)))
   (ezeka-octavo-initialize-kasten kasten)
   (unless noselect
@@ -318,22 +318,11 @@ destination kasten."
 ;;; Selecting notes
 ;;;=============================================================================
 
-(eval-after-load 'vertico
-  (defun ezeka-octavo--setup-vertico ()
-    "Define `vertico-sort-history-alpha' sort if not already defined."
-    (put 'vertico-sort--define 'lisp-indent-function 1)
-    (unless (fboundp 'vertico-sort-reverse-alpha)
-      (vertico-sort--define (reverse-alpha)
-                            32 (if (eq % "") 0 (/ (aref % 0) 4)) string> string>))))
-
-(defun ezeka-octavo-insert-link-to-kasten (kasten &optional link-only sort)
+(defun ezeka-octavo-insert-link-to-kasten (kasten &optional link-only)
   "Insert a link to KASTEN.
-If LINK-ONLY (or \\[universal-argument]) is non-nil, insert plain link.
-If `vertico' exists and SORT is non-nil, set `vertico-sort-function' to it."
+If LINK-ONLY (or \\[universal-argument]) is non-nil, insert plain link."
   (interactive (list (ezeka--read-kasten) nil current-prefix-arg))
-  (when (featurep 'vertico) (ezeka-octavo--setup-vertico))
-  (let ((vertico-sort-function (or sort 'vertico-sort-history-alpha))
-        (target (ezeka--select-file
+  (let ((target (ezeka--select-file
                  (ezeka--directory-files (ezeka-kasten kasten))
                  "Insert link to: ")))
     (funcall-interactively 'ezeka-insert-link-with-metadata
@@ -350,11 +339,10 @@ If `vertico' exists and SORT is non-nil, set `vertico-sort-function' to it."
       (point))
     (point))))
 
-(defun ezeka-octavo-insert-contextual-link (&optional n kasten sort)
+(defun ezeka-octavo-insert-contextual-link (&optional n kasten)
   "Insert a link to KASTEN based on the previous N words.
 If KASTEN is not given, assume one with highest order or,
-with \\[universal-argument], select Kasten interactively. If SORT is
-non-nil, set `vertico-sort-function' to it."
+with \\[universal-argument], select Kasten interactively."
   (interactive
    (list (prefix-numeric-value current-prefix-arg)
          (if (and current-prefix-arg
@@ -362,7 +350,6 @@ non-nil, set `vertico-sort-function' to it."
              (ezeka--read-kasten)
            "numerus")))     ; HARDCODED
   (let ((pos (point))
-        (vertico-sort-function (or sort 'vertico-sort-history-alpha))
         (octavo-link-and-title nil)
         (context (downcase (ezeka-octavo--link-context n))))
     (when (save-excursion
@@ -381,16 +368,13 @@ non-nil, set `vertico-sort-function' to it."
 (cmd-named ezeka-octavo-insert-link-to-numerus
   (ezeka-octavo-insert-link-to-kasten "numerus"))
 (cmd-named ezeka-octavo-insert-link-to-tempus
-  (ezeka-octavo-insert-link-to-kasten "tempus"
-                                      current-prefix-arg
-                                      'vertico-sort-reverse-alpha))
+  (ezeka-octavo-insert-link-to-kasten "tempus" current-prefix-arg))
 (cmd-named ezeka-octavo-insert-link-to-scriptum
   (ezeka-octavo-insert-link-to-kasten "scriptum"))
 
-(defun ezeka-octavo-find-note-in-kasten (kasten &optional other-window sort)
+(defun ezeka-octavo-find-note-in-kasten (kasten &optional other-window)
   "Temporarily set octavo variables for KASTEN and call `octavo-find-file'.
-With \\[universal-argument] OTHER-WINDOW, open in other window.
-If `vertico' exists and SORT is non-nil, set `vertico-sort-function' to it."
+With \\[universal-argument] OTHER-WINDOW, open in other window."
   (interactive
    (list (if-let ((kasten
                    (and octavo-directory
@@ -399,30 +383,29 @@ If `vertico' exists and SORT is non-nil, set `vertico-sort-function' to it."
              kasten
            (ezeka--read-kasten))
          current-prefix-arg))
-  (when (featurep 'vertico) (ezeka-octavo--setup-vertico))
-  (let* ((vertico-sort-function (or sort 'vertico-sort-history-alpha))
-         (file (ezeka--select-file (ezeka--directory-files kasten)
+  (let* ((file (ezeka--select-file (ezeka--directory-files kasten)
                                    (if other-window
                                        "Find note in other window: "
                                      "Find note: "))))
     (unless (ezeka-handle-symlink file (not other-window))
       (ezeka-find-file file (not other-window)))))
 
-(defmacro ezeka-octavo--define-kasten-finders (kasten &optional sort)
+(defmacro ezeka-octavo--define-kasten-finders (kasten)
   "Define a set of new commands for finding notes in KASTEN.
-SORT is the function that vertico uses to sort the results."
+The commands are in the form `ezeka-octavo-find-in-<kasten>'
+and `ezeka-octavo-find-in-<kasten>-other-window'."
   `(progn
      (defun ,(intern (concat "ezeka-octavo-find-in-" kasten)) ()
        ,(format "Find a note in %s kasten." kasten)
        (interactive)
-       (ezeka-octavo-find-note-in-kasten ,kasten nil ,sort))
+       (ezeka-octavo-find-note-in-kasten ,kasten nil))
      (defun ,(intern (concat "ezeka-octavo-find-in-" kasten "-other-window")) ()
        ,(format "Find a note in %s kasten in other window." kasten)
        (interactive)
-       (ezeka-octavo-find-note-in-kasten ,kasten 'other-window ,sort))))
+       (ezeka-octavo-find-note-in-kasten ,kasten 'other-window))))
 
 (ezeka-octavo--define-kasten-finders "numerus")
-(ezeka-octavo--define-kasten-finders "tempus" 'vertico-sort-reverse-alpha)
+(ezeka-octavo--define-kasten-finders "tempus")
 (ezeka-octavo--define-kasten-finders "scriptum")
 
 ;;;=============================================================================
