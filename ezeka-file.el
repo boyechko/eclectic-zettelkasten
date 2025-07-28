@@ -614,32 +614,17 @@ otherwise."
                 (dir (ezeka-id-directory id))
                 (matches (flatten-list
                           (file-expand-wildcards
-                           (expand-file-name basename dir))))
-                (files (or (cl-remove-if-not
-                            (lambda (f)
-                              (null (file-attribute-type (file-attributes f))))
-                            matches)
-                           t)))
+                           (expand-file-name basename dir)))))
       (cond ((zerop (length matches)) nil)
             ((not (cdr matches)) (car matches))
-            ((eq t files)
-             (warn "Found multiple symbolic links for `%s':\n    %s"
-                   link
-                   (mapcar #'file-name-base matches))
-             (setq result (ezeka--select-file matches
-                                              "Multiple matches found. Select one: "
-                                              'require-match))
-             (kill-new (mapconcat (lambda (m)
-                                    (format "(delete-file \"%s\")" m))
-                                  (cl-remove result matches :test #'string=)
-                                  " "))
-             (message "delete-file call saved to kill ring")
-             result)
-            ((not (cdr files)) (car files))
             (t
              (warn "Found multiple matches for `%s':\n- %s"
                    link
-                   (mapconcat #'file-name-base matches "\n- "))
+                   (mapconcat (lambda (f)
+                                (if (file-symlink-p f)
+                                    (format "<SYMLINK> (delete-file \"%s\")" f)
+                                  (file-name-base f)))
+                              matches "\n- "))
              (ezeka--select-file matches
                                  "Multiple matches found. Select one: "
                                  'require-match))))))
