@@ -31,7 +31,7 @@
 
 ;;; Code:
 
-(defun ezeka-insert-symlinks-table (symlinks)
+(defun ezeka-insert-symlink-table (symlinks)
   "Insert the SYMLINKS as a CSV table."
   (interactive (list (ezeka-scan-current-symlinks
                       (read-string "Symlinks in which subdirectory? "))))
@@ -41,16 +41,18 @@
       (let-alist symlink
         (when (eq .status 'missing)
           (push symlink missing))
-        (insert (format "%s\"%s\",\"%s\",\"%s\",\"%s\"\n"
-                        (if (eq .status 'exists)
-                            ""
-                          (format "[[%s]] --- " (ezeka-file-name-id .virtual-rubric)))
-                        .virtual-rubric
-                        .target-rubric
-                        (format-time-string "%FT%R" .modified)
-                        .status))))
+        (insert (ezeka-symlink-table-format-row symlink))))
     (message "%d symlinks total, %d missing"
              (length symlinks) (length missing))))
+
+(defun ezeka-symlink-table-format-row (symlink)
+  "Return a string of formatted CSV row based on SYMLINK."
+  (let-alist symlink
+    (format "\"%s\",\"%s\",\"%s\",\"%s\"\n"
+            \.virtual-rubric
+            \.target-rubric
+            (format-time-string "%FT%R" \.modified)
+            \.status)))
 
 (defun ezeka-scan-current-symlinks (subdir)
   "Scan SUBDIR for all current symbolic links."
@@ -61,21 +63,37 @@
                      dir
                      (format "^\\w.*\\.%s$" ezeka-file-extension)))
         (when (file-symlink-p file)
-          (let* ((virtual-rubric (file-name-base file))
-                 (target-path (expand-file-name
-                               (file-symlink-p file)
-                               (file-name-directory file)))
-                 (target-rubric (file-name-base target-path))
-                 (modified (file-attribute-modification-time (file-attributes file)))
-                 (status (if (file-exists-p target-path)
-                             'exists
-                           'missing)))
-            (push `((virtual-rubric . ,virtual-rubric)
-                    (target-rubric . ,target-rubric)
-                    (modified . ,modified)
-                    (status . ,status))
-                  symlinks)))))
+          (push (ezeka-create-symlink-record file) symlinks))))
     symlinks))
+
+(defun ezeka-create-symlink-record (file)
+  "Create a new symlink record for the given FILE."
+  (unless (file-symlink-p file)
+    (error "File is not a symlink: %s" file))
+  (let* ((virtual-rubric (file-name-base file))
+         (target-path (expand-file-name
+                       (file-symlink-p file)
+                       (file-name-directory file)))
+         (target-rubric (file-name-base target-path))
+         (modified (file-attribute-modification-time (file-attributes file)))
+         (status (if (file-exists-p target-path)
+                     'exists
+                   'missing)))
+    `((virtual-rubric . ,virtual-rubric)
+      (target-rubric . ,target-rubric)
+      (modified . ,modified)
+      (status . ,status))))
+
+(defun ezeka-update-symlink-csv-row ()
+  "Update the symlink information on the CSV row at point."
+  (interactive)
+  (unless (eq 'csv-mode major-mode)
+    (user-error "This command only works in CSV mode"))
+  (let* ((row (csv-parse-current-row))
+         (path (ezeka-link-file (car row)))
+         (record (ezeka-create-symlink-record path)))
+    (kill-region (line-beginning-position) (line-end-position))
+    (insert (ezeka-symlink-table-format-row record))))
 
 (provide 'ezeka-virtual)
 ;;; ezeka-virtual.el ends here
