@@ -1888,20 +1888,7 @@ non-nil, do not offer to do a text search."
              (ezeka-file-link file))
            nil
            'ask)))
-  (let* ((_pprint_record
-          (lambda (rec)
-            (let-alist rec
-              (let* ((t-file (ezeka-link-file .target))
-                     (t-name (when t-file (file-name-base t-file))))
-                (format "%s %s`%s' on %s (%s)"
-                        .source
-                        (if t-file "moved to " "")
-                        (propertize (or t-name .target) 'face 'bold)
-                        (format-time-string
-                         "%F %a %R"
-                         (encode-time (parse-time-string .time)))
-                        (or .comment ""))))))
-         (trail (ezeka--note-move-trail note)))
+  (let* ((trail (ezeka--note-move-trail note)))
     (cond ((and (null trail) (ezeka-link-file note))
            (when (y-or-n-p (format "No record of moving %s, but it exists. Visit? " note))
              (ezeka-find-file (ezeka-link-file note))))
@@ -1915,11 +1902,25 @@ non-nil, do not offer to do a text search."
                 (or (eq visit 'visit)
                     (y-or-n-p
                      (format "%s\nVisit %s? "
-                             (mapconcat _pprint_record (nreverse trail) "\n")
+                             (mapconcat 'ezeka--note-moved-pprint-record (nreverse trail) "\n")
                              (propertize (alist-get 'target (car trail)) 'face 'bold)))))
            (ezeka-find-link (alist-get 'target (car trail))))
           (t
-           (message (mapconcat _pprint_record (nreverse trail) "\n"))))))
+           (message (mapconcat 'ezeka--note-moved-pprint-record (nreverse trail) "\n"))))))
+
+(defun ezeka--note-moved-pprint-record (record)
+  "Return a pretty print of the move trail RECORD."
+  (let-alist record
+    (let* ((t-file (ezeka-link-file \.target))
+           (t-name (when t-file (file-name-base t-file))))
+      (format "`%s' %s `%s' on %s (%s)"
+              \.source
+              (if \.target "moved to" "")
+              (propertize (or t-name \.target) 'face 'bold)
+              (format-time-string
+               "%F %a %R"
+               (encode-time (parse-time-string \.time)))
+              (or \.comment "")))))
 
 (defun ezeka--replace-links (before after &optional confirm)
   "Replace links to BEFORE to AFTER.
