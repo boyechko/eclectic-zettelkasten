@@ -429,7 +429,7 @@ interactively edit the text."
                                             desc-string
                                           (read-string "Insert: " desc-string))
                                         (ezeka--format-link link))
-      (ezeka--insert-link-with-spaces link))))
+      (ezeka--insert-link-with-spaces zettel))))
 
 (defun ezeka-insert-link-to-visiting (arg)
   "Insert a link to another Zettel being currently visited.
