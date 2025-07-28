@@ -239,6 +239,8 @@ from. COMMENT can be added instead of TARGET."
                       (insert (ezeka--breadcrumbs-string :target t-file
                                                          :source s-file
                                                          :comment comment))
+                      (unless (looking-at "\n\n")
+                        (insert "\n"))
                       (message "Dropped breadcrumbs for `%s' as %s"
                                (ezeka-file-name-id t-file)
                                status)))
