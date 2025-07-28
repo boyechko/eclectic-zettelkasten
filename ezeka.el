@@ -215,7 +215,8 @@ if not a string (or with \\[universal-argument] \\[universal-argument]), ask for
           'target target)
         (delete-file linkname)
         (when (ezeka--make-symbolic-link new-target (or new-name linkname))
-          (message "Symbolic link updated")))
+          (when (y-or-n-p "Symbolic link updated. Visit it? ")
+            (ezeka-find-file (or new-name linkname)))))
     (user-error "This is not a symbolic link")))
 
 (defun ezeka-handle-symlink (file &optional arg)
