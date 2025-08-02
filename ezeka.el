@@ -2222,40 +2222,8 @@ use the current KASTEN without asking."
         (goto-char (point-min))
         (let* ((head-level (nth 1 (org-heading-components)))
                (head-title (nth 4 (org-heading-components)))
-               match-data
-               timestamp)
-          (cond ((string-match "\\(.*\\) \\([[<].*[]>]\\)" head-title)
-                 (setq match-data (match-data))
-                 (setf (alist-get 'title mdata)
-                       (ezeka--minibuffer-edit-string
-                        (match-string-no-properties 1 head-title)
-                        nil
-                        "Title for new note: "))
-                 (setf (alist-get 'created mdata)
-                       (org-timestamp-to-time
-                        (org-timestamp-from-string
-                         (progn
-                           (set-match-data match-data)
-                           (match-string 2 head-title)))))
-                 (when (string-match "^\\([[:alpha:]]+\\): .*" head-title)
-                   (setf (alist-get 'label mdata)
-                         (ezeka--minibuffer-edit-string
-                          (match-string 1 head-title)
-                          nil
-                          "Label: "))))
-                ((org-get-scheduled-time nil)
-                 (setf (alist-get 'created mdata)
-                       (org-get-scheduled-time nil)))
-                (t
-                 (setf (alist-get 'title mdata)
-                       (ezeka--minibuffer-edit-string
-                        (buffer-substring-no-properties (point-at-bol) (point-at-eol))
-                        nil
-                        "Title for new note: "))
-                 (setf (alist-get 'created mdata)
-                       (parse-time-string
-                        (read-string "No timestamp found. Enter it here: "
-                                     (ezeka-timestamp nil 'full))))))
+               (mdata (ezeka--extract-subtree-gather-metadata
+                       mdata head-level head-title)))
           (setf (alist-get 'label mdata)
                 (ezeka--read-label kasten))
           (setf (alist-get 'id mdata)
@@ -2294,6 +2262,45 @@ use the current KASTEN without asking."
                 (ezeka-maybe-add-change-log-entry (file-truename parent-file)
                   (ezeka-format-metadata "Extract \"%R\" [[%i]]." mdata))))))))))
 
+(defun ezeka--extract-subtree-gather-metadata (metadata head-level head-title)
+  "Gather metadata about the subtree to be extracted.
+METADATA is the new note's currently known metadata, which
+will be supplemented and returned. HEAD-LEVEL is the level as
+integer. HEAD-TITLE is the title of the heading to be extracted."
+  (let (match-data)
+    (cond ((string-match "\\(.*\\) \\([[<].*[]>]\\)" head-title)
+           (setq match-data (match-data))
+           (setf (alist-get 'title metadata)
+                 (ezeka--minibuffer-edit-string
+                  (match-string-no-properties 1 head-title)
+                  nil
+                  "Title for new note: "))
+           (setf (alist-get 'created metadata)
+                 (org-timestamp-to-time
+                  (org-timestamp-from-string
+                   (progn
+                     (set-match-data match-data)
+                     (match-string 2 head-title)))))
+           (when (string-match "^\\([[:alpha:]]+\\): .*" head-title)
+             (setf (alist-get 'label metadata)
+                   (ezeka--minibuffer-edit-string
+                    (match-string 1 head-title)
+                    nil
+                    "Label: "))))
+          ((org-get-scheduled-time nil)
+           (setf (alist-get 'created metadata)
+                 (org-get-scheduled-time nil)))
+          (t
+           (setf (alist-get 'title metadata)
+                 (ezeka--minibuffer-edit-string
+                  (buffer-substring-no-properties (point-at-bol) (point-at-eol))
+                  nil
+                  "Title for new note: "))
+           (setf (alist-get 'created metadata)
+                 (parse-time-string
+                  (read-string "No timestamp found. Enter it here: "
+                               (ezeka-timestamp nil 'full))))))
+    metadata))
 (defun ezeka-stage-links-in-subtree (&optional start end)
   "Stage all links in the current `org-mode' subtree.
 If region is active, only do so for links between START and
