@@ -2259,6 +2259,7 @@ use the current KASTEN without asking."
                         head-title
                         " "
                         (ezeka--format-link (alist-get 'link mdata)))
+                (widen)
                 (ezeka-maybe-add-change-log-entry (file-truename parent-file)
                   (ezeka-format-metadata "Extract \"%R\" [[%i]]." mdata))))))))))
 
