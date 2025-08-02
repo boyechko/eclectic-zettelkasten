@@ -1611,100 +1611,6 @@ Return the result of the conversion."
        (optional (or "]" ">"))))
   "Regexp matching Org timestamp, either with or without time.")
 
-(defun ezeka-extract-subtree-as-new-note (&optional id kasten)
-  "Create new Zettel from the current org subtree.
-With \\[universal-argument], query for ID. With \\[universal-argument] \\[universal-argument],
-use the current KASTEN without asking."
-  (interactive
-   (let ((id (when current-prefix-arg
-               (ezeka--read-id "ID for new note: "))))
-     (list id
-           (or (and id (ezeka-link-kasten id))
-               (if (equal current-prefix-arg '(16))
-                   (ezeka-file-kasten buffer-file-name)
-                 (ezeka--read-kasten "New note in which Kasten? "))))))
-  (let* ((parent-file buffer-file-name)
-         (kstruct (ezeka-kasten kasten))
-         mdata)
-    (setf (alist-get 'parent mdata)
-          (ezeka-file-link buffer-file-name))
-    (save-excursion
-      (save-restriction
-        (org-narrow-to-subtree)
-        (goto-char (point-min))
-        (let* ((head-level (nth 1 (org-heading-components)))
-               (head-title (nth 4 (org-heading-components)))
-               match-data
-               timestamp)
-          (cond ((string-match "\\(.*\\) \\([[<].*[]>]\\)" head-title)
-                 (setq match-data (match-data))
-                 (setf (alist-get 'title mdata)
-                       (ezeka--minibuffer-edit-string
-                        (match-string-no-properties 1 head-title)
-                        nil
-                        "Title for new note: "))
-                 (setf (alist-get 'created mdata)
-                       (org-timestamp-to-time
-                        (org-timestamp-from-string
-                         (progn
-                           (set-match-data match-data)
-                           (match-string 2 head-title)))))
-                 (when (string-match "^\\([[:alpha:]]+\\): .*" head-title)
-                   (setf (alist-get 'label mdata)
-                         (ezeka--minibuffer-edit-string
-                          (match-string 1 head-title)
-                          nil
-                          "Label: "))))
-                ((org-get-scheduled-time nil)
-                 (setf (alist-get 'created mdata)
-                       (org-get-scheduled-time nil)))
-                (t
-                 (setf (alist-get 'title mdata)
-                       (ezeka--minibuffer-edit-string
-                        (buffer-substring-no-properties (point-at-bol) (point-at-eol))
-                        nil
-                        "Title for new note: "))
-                 (setf (alist-get 'created mdata)
-                       (parse-time-string
-                        (read-string "No timestamp found. Enter it here: ")))))
-          (setf (alist-get 'label mdata)
-                (ezeka--read-label kasten))
-          (setf (alist-get 'id mdata)
-                (or id
-                    (if (eq (ezeka-kasten-id-type kstruct) :tempus)
-                        (ezeka-tempus-currens
-                         (ezeka--complete-time (alist-get 'created mdata)))
-                      (ezeka--generate-id kasten))))
-          (setf (alist-get 'link mdata)
-                (ezeka-make-link kasten (alist-get 'id mdata)))
-          (setf (alist-get 'path mdata)
-                (ezeka-link-path (alist-get 'link mdata) mdata))
-          (setf (alist-get 'rubric mdata)
-                (ezeka-encode-rubric mdata))
-          (if (file-exists-p (alist-get 'path mdata))
-              (user-error "Aborting, file already exists: %s" (alist-get 'path mdata))
-            (let ((entry-pt (point))
-                  (content (org-copy-subtree)))
-              (with-current-buffer (get-buffer-create (alist-get 'path mdata))
-                ;; New file buffer
-                (ezeka-insert-header-template nil nil nil nil nil mdata)
-                (insert "\n" org-subtree-clip)
-                (set-visited-file-name (alist-get 'path mdata) t)
-                (basic-save-buffer)
-                (ezeka-maybe-add-change-log-entry (alist-get 'path mdata)
-                  (ezeka-format-metadata "Extract from [[%p]]." mdata)))
-              (with-current-buffer (get-file-buffer (file-truename parent-file))
-                ;; Back in original buffer
-                (goto-char entry-pt)
-                (org-cut-subtree)
-                (insert (make-string head-level ?*)
-                        " "
-                        head-title
-                        " "
-                        (ezeka--format-link (alist-get 'link mdata)))
-                (ezeka-maybe-add-change-log-entry (file-truename parent-file)
-                  (ezeka-format-metadata "Extract \"%R\" [[%i]]." mdata))))))))))
-
 (defun ezeka-open-link-at-point (&optional same-window freeform)
   "Open a Zettel link at point even if it's not formatted as a link.
 If SAME-WINDOW is non-nil (or \\[universal-argument]), open the link in the same window.
@@ -2292,6 +2198,101 @@ Return the target link and open it (unless NOSELECT is non-nil)."
            (ezeka--copy-note source-link target-link))
           (t
            (ezeka--begin-moving-note source-file target-link)))))
+
+(defun ezeka-extract-subtree-as-new-note (&optional id kasten)
+  "Create new Zettel from the current org subtree.
+With \\[universal-argument], query for ID. With \\[universal-argument] \\[universal-argument],
+use the current KASTEN without asking."
+  (interactive
+   (let ((id (when current-prefix-arg
+               (ezeka--read-id "ID for new note: "))))
+     (list id
+           (or (and id (ezeka-link-kasten id))
+               (if (equal current-prefix-arg '(16))
+                   (ezeka-file-kasten buffer-file-name)
+                 (ezeka--read-kasten "New note in which Kasten? "))))))
+  (let* ((parent-file buffer-file-name)
+         (kstruct (ezeka-kasten kasten))
+         mdata)
+    (setf (alist-get 'parent mdata)
+          (ezeka-file-link buffer-file-name))
+    (save-excursion
+      (save-restriction
+        (org-narrow-to-subtree)
+        (goto-char (point-min))
+        (let* ((head-level (nth 1 (org-heading-components)))
+               (head-title (nth 4 (org-heading-components)))
+               match-data
+               timestamp)
+          (cond ((string-match "\\(.*\\) \\([[<].*[]>]\\)" head-title)
+                 (setq match-data (match-data))
+                 (setf (alist-get 'title mdata)
+                       (ezeka--minibuffer-edit-string
+                        (match-string-no-properties 1 head-title)
+                        nil
+                        "Title for new note: "))
+                 (setf (alist-get 'created mdata)
+                       (org-timestamp-to-time
+                        (org-timestamp-from-string
+                         (progn
+                           (set-match-data match-data)
+                           (match-string 2 head-title)))))
+                 (when (string-match "^\\([[:alpha:]]+\\): .*" head-title)
+                   (setf (alist-get 'label mdata)
+                         (ezeka--minibuffer-edit-string
+                          (match-string 1 head-title)
+                          nil
+                          "Label: "))))
+                ((org-get-scheduled-time nil)
+                 (setf (alist-get 'created mdata)
+                       (org-get-scheduled-time nil)))
+                (t
+                 (setf (alist-get 'title mdata)
+                       (ezeka--minibuffer-edit-string
+                        (buffer-substring-no-properties (point-at-bol) (point-at-eol))
+                        nil
+                        "Title for new note: "))
+                 (setf (alist-get 'created mdata)
+                       (parse-time-string
+                        (read-string "No timestamp found. Enter it here: "
+                                     (ezeka-timestamp nil 'full))))))
+          (setf (alist-get 'label mdata)
+                (ezeka--read-label kasten))
+          (setf (alist-get 'id mdata)
+                (or id
+                    (if (eq (ezeka-kasten-id-type kstruct) :tempus)
+                        (ezeka-tempus-currens
+                         (ezeka--complete-time (alist-get 'created mdata)))
+                      (ezeka--generate-id kasten))))
+          (setf (alist-get 'link mdata)
+                (ezeka-make-link kasten (alist-get 'id mdata)))
+          (setf (alist-get 'path mdata)
+                (ezeka-link-path (alist-get 'link mdata) mdata))
+          (setf (alist-get 'rubric mdata)
+                (ezeka-encode-rubric mdata))
+          (if (file-exists-p (alist-get 'path mdata))
+              (user-error "Aborting, file already exists: %s" (alist-get 'path mdata))
+            (let ((entry-pt (point))
+                  (content (org-copy-subtree)))
+              (with-current-buffer (get-buffer-create (alist-get 'path mdata))
+                ;; New file buffer
+                (ezeka-insert-header-template nil nil nil nil nil mdata)
+                (insert "\n" org-subtree-clip)
+                (set-visited-file-name (alist-get 'path mdata) t)
+                (basic-save-buffer)
+                (ezeka-maybe-add-change-log-entry (alist-get 'path mdata)
+                  (ezeka-format-metadata "Extract from [[%p]]." mdata)))
+              (with-current-buffer (get-file-buffer (file-truename parent-file))
+                ;; Back in original buffer
+                (goto-char entry-pt)
+                (org-cut-subtree)
+                (insert (make-string head-level ?*)
+                        " "
+                        head-title
+                        " "
+                        (ezeka--format-link (alist-get 'link mdata)))
+                (ezeka-maybe-add-change-log-entry (file-truename parent-file)
+                  (ezeka-format-metadata "Extract \"%R\" [[%i]]." mdata))))))))))
 
 (defun ezeka-stage-links-in-subtree (&optional start end)
   "Stage all links in the current `org-mode' subtree.
