@@ -33,7 +33,7 @@
 (require 'ezeka-file)
 (require 'ezeka-meta)
 
-(defcustom ezeka-snippet-heading "Snippet"
+(defcustom ezeka-snippet-heading "Content"
   "The text of the snippet heading."
   :type 'string)
 
