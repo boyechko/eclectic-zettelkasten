@@ -225,8 +225,8 @@ corresponding to metadata fields."
         mdata)
     (signal 'wrong-type-argument (list 'key-value-pairs-p values))))
 
-(defun ezeka-file-content (file &optional header-only)
-  "Return content of FILE, getting it first from opened buffer.
+(defun ezeka-file-content (file-or-buffer &optional header-only)
+  "Return content of FILE-OR-BUFFER, getting it first from opened buffer.
 If HEADER-ONLY is non-nil, only get the header."
   (let ((_retrieve-content
          (lambda ()
@@ -238,16 +238,20 @@ If HEADER-ONLY is non-nil, only get the header."
               (goto-char (point-min))
               (if (re-search-forward ezeka-header-separator-regexp nil t)
                   (match-beginning 0)
-                (point-max)))))))
-    (if (get-file-buffer file)
-        (save-excursion
-          (with-current-buffer (get-file-buffer file)
-            (save-restriction
-              (widen)
-              (funcall _retrieve-content))))
-      (with-temp-buffer
-        (insert-file-contents file)
-        (funcall _retrieve-content)))))
+                (point-max))))))
+        (buffer (if (bufferp file-or-buffer)
+                    file-or-buffer
+                  (get-file-buffer file-or-buffer))))
+    (cond (buffer
+           (save-excursion
+             (with-current-buffer buffer
+               (save-restriction
+                 (widen)
+                 (funcall _retrieve-content)))))
+          (t
+           (with-temp-buffer
+             (insert-file-contents file-or-buffer)
+             (funcall _retrieve-content))))))
 
 (defun ezeka-file-metadata (file)
   "Return an alist of metadata for FILE."
