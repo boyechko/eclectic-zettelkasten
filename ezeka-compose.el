@@ -223,7 +223,7 @@ insert the summary before the content."
                 (replace-match ""))
               ;; Remove Zettel links
               (goto-char start)
-              (while (re-search-forward " ?\\[\\[[^]]+]]" nil t)
+              (while (re-search-forward " ?\\[\\[[[:alnum:]~-]+]]" nil t)
                 (replace-match ""))
               ;; Remove inline @@...@@ and <...> comments, but not {...}
               (goto-char start)
