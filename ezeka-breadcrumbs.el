@@ -399,22 +399,14 @@ can be a short string."
   (interactive "p")
   (cond ((> arg 1)
          (ezeka-breadcrumbs-stop-trail))
-        ((and (= arg 1)
-              (org-at-heading-p)
+        ((and (org-at-heading-p)
               (or (string= (nth 4 (org-heading-components))
                            ezeka-breadcrumbs-trail-headline)
                   (y-or-n-p "Drop breadcrumbs under this heading? ")))
          (call-interactively 'ezeka-breadcrumbs-start-trail))
-        ((= arg 1)
+        (t
          (or (ezeka-breadcrumbs-visit-trailhead)
-             (call-interactively 'ezeka-breadcrumbs-start-trail)))
-        ((and (= arg 1)
-              (ezeka--breadcrumbs-heading)
-              (y-or-n-p (format "There is a %s heading in this buffer, switch to it? "
-                                ezeka-breadcrumbs-trail-headline)))
-         (save-excursion
-           (call-interactively 'ezeka-breadcrumbs-start-trail)
-           (goto-char (marker-position (ezeka--breadcrumbs-heading)))))))
+             (call-interactively 'ezeka-breadcrumbs-start-trail)))))
 
 (provide 'ezeka-breadcrumbs)
 ;;; ezeka-breadcrumbs.el ends here
