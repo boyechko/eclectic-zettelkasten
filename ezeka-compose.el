@@ -204,11 +204,9 @@ insert the summary before the content."
             ;; If current line is a comment, create a heading after it
             (when (org-at-comment-p)
               (org-insert-subheading nil))
-            ;; Delete existing text
             (ezeka--org-move-after-drawers)
             (let ((start (point))
-                  (comments-removed 0)
-                  (footnotes-removed 0)
+                  (removed-elements '(comments 0 footnotes 0))
                   (snip-buf (find-file-noselect snip-file))
                   (content '()))
               (delete-region start (point-max))
@@ -218,41 +216,55 @@ insert the summary before the content."
               ;; Insert the copied subtrees and remove extraneous stuff
               (apply #'insert (nreverse content))
               (goto-char start)
-              ;; Transform headings
-              (while (re-search-forward "^[*]+ " nil t)
-                (goto-char (match-beginning 0))
-                (replace-match (concat "*" (match-string 0)))
-                ;; Remove headings if desired
-                (when (cl-find "noheadings" our-tags :test #'string=)
-                  (ezeka--org-move-after-drawers)
-                  (kill-region (match-beginning 0) (point))))
-              ;; Remove <<tags>>
-              (goto-char start)
-              (while (re-search-forward "<<[^>]+>>\n*" nil t)
-                (replace-match ""))
-              ;; Remove Zettel links
-              (goto-char start)
-              (while (re-search-forward " ?\\[\\[[[:alnum:]~-]+]]" nil t)
-                (replace-match ""))
-              ;; Remove inline @@...@@ and <...> comments, but not {...}
-              (goto-char start)
-              (while (re-search-forward " ?\\(@@\\|<\\).+?\\(@@\\|>\\)\n*" nil t)
-                (cl-incf comments-removed)
-                (replace-match ""))
-              ;; Remove footnotes if need be
-              (unless ezeka-insert-snippet-footnotes
-                (goto-char start)
-                (while (re-search-forward "^\\[fn:.+?\\].*?$" nil t)
-                  (goto-char (match-beginning 0))
-                  (kill-paragraph 1)
-                  (cl-incf footnotes-removed)))
+              (setq removed-elements
+                (ezeka--clean-inserted-content start our-tags))
+
               (org-indent-region (point-min) (point-max))
               (goto-char (point-max))
               (insert "\n")
-              (message "Removed %d comments and %d footnotes"
-                       comments-removed footnotes-removed)
               (rb-collapse-blank-lines)
+              (message "Removed %d comments and %d footnotes"
+                       (plist-get removed-elements 'comments)
+                       (plist-get removed-elements 'footnotes))
               t)))))))
+
+(defun ezeka--clean-inserted-content (start our-tags)
+  "Clean up inserted content in `ezeka-insert-snippet-text'.
+START is buffer position where to start. OUR-TAGS are the
+tags specifying what to include or not. Return a plist of
+removed elements."
+  (let ((comments-removed 0)
+        (footnotes-removed 0))
+    ;; Transform headings
+    (while (re-search-forward "^[*]+ " nil t)
+      (goto-char (match-beginning 0))
+      (replace-match (concat "*" (match-string 0)))
+      ;; Remove headings if desired
+      (when (cl-find "noheadings" our-tags :test #'string=)
+        (ezeka--org-move-after-drawers)
+        (kill-region (match-beginning 0) (point))))
+    ;; Remove <<tags>>
+    (goto-char start)
+    (while (re-search-forward "<<[^>]+>>\n*" nil t)
+      (replace-match ""))
+    ;; Remove Zettel links
+    (goto-char start)
+    (while (re-search-forward " ?\\[\\[[[:alnum:]~-]+]]" nil t)
+      (replace-match ""))
+    ;; Remove inline @@...@@ and <...> comments, but not {...}
+    (goto-char start)
+    (while (re-search-forward " ?\\(@@\\|<\\).+?\\(@@\\|>\\)\n*" nil t)
+      (cl-incf comments-removed)
+      (replace-match ""))
+    ;; Remove footnotes if need be
+    (unless ezeka-insert-snippet-footnotes
+      (goto-char start)
+      (while (re-search-forward "^\\[fn:.+?\\].*?$" nil t)
+        (goto-char (match-beginning 0))
+        (kill-paragraph 1)
+        (cl-incf footnotes-removed)))
+    (list 'comments comments-removed
+          'footnotes footnotes-removed)))
 
 (defun ezeka--update-inserted-snippet ()
   "Update the snippet in the current note wherever it is used."
