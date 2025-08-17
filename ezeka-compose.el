@@ -122,8 +122,9 @@ modification date."
   "Extract snippet subtree from FILE.
 If SUMMARY is non-nil, also extract summary. ORG-ID is the ID of
 where the content is to be inserted."
-  (let (content)
-    (with-current-buffer (get-file-buffer file)
+  (let ((buf (find-file-noselect file))
+        content)
+    (with-current-buffer buf
       ;; Include Summary section if present
       (when (and (or summary ezeka-insert-snippet-summary)
                  (org-find-exact-headline-in-buffer "Summary"))
