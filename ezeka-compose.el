@@ -33,9 +33,10 @@
 (require 'ezeka-file)
 (require 'ezeka-meta)
 
-(defcustom ezeka-snippet-heading "Content"
-  "The text of the snippet heading."
-  :type 'string)
+(defcustom ezeka-snippet-heading
+  '("Content" "Snippet" "Write-Up")
+  "The title of the snippet heading."
+  :type '(or string list))
 
 (defcustom ezeka-snippet-modified-property "MODIFIED"
   "Name of the snippet heading's last-modified property."
@@ -91,12 +92,20 @@ Return the new position; otherwise, nil."
     (save-excursion
       (goto-char (point-min))
       ;; HARDCODED Match the entire org-mode heading line
-      (when (re-search-forward (concat "^\\*+ +"
-                                       ezeka-snippet-heading
-                                       ".*$"))
+      (when (re-search-forward (ezeka--snippet-heading-regexp))
         (setq pos (match-end 0))))
     (when pos
       (goto-char pos))))
+
+(defun ezeka--snippet-heading-regexp ()
+  "Return the regexp to match `ezeka-snippet-heading'."
+  (concat "^\\*+ +"
+          (if (stringp ezeka-snippet-heading)
+              ezeka-snippet-heading
+            (concat "\\("
+                    (apply #'ezeka--concat-strings "\\|" ezeka-snippet-heading)
+                    "\\)"))
+          ".*$"))
 
 (defun ezeka-set-modified-property (&optional time)
   "Add :MODIFIED: property to the current heading.
