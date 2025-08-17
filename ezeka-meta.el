@@ -146,6 +146,7 @@ The format control string may contain the following %-sequences:
 %M means modification timestamp.
 %p means parent.
 %P means path.
+%o means oldnames.
 %R means rubric.
 %s means stable mark (see `ezeka-header-rubric-stable-mark').
 %t means title.
@@ -195,6 +196,7 @@ use `ezeka-long-timestamp-format'."
                         (?l . ,(or \.label "nil"))
                         (?L . ,(ezeka--format-link \.id))
                         (?M . ,(funcall _format-time \.modified))
+                        (?o . ,\.oldnames)
                         (?p . ,\.parent)
                         (?P . ,\.path)
                         (?R . ,\.rubric)
