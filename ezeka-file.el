@@ -494,13 +494,8 @@ If MATCH-ENTIRE is non-nil, enclose the regexp in string boundaries."
 (defun ezeka-id-valid-p (id &optional id-type)
   "Return non-nil if ID matches the ID-TYPE.
 If ID-TYPE is not given, check ID against all known types."
-  (let ((kasten (if id-type
-                    (cl-find id-type (ezeka-kaesten) :key #'ezeka-kasten-id-type)
-                  (cl-find id (ezeka-kaesten)
-                           :key #'ezeka-kasten-id-regexp
-                           :test #'string-match-p))))
-    (and (stringp id)
-         (string-match-p (ezeka--id-regexp id-type 'match-entire) id))))
+  (and (stringp id)
+       (string-match-p (ezeka--id-regexp id-type 'match-entire) id)))
 
 ;; TODO Replace "link" with "id," reserving "link" term for actual links
 (defmacro ezeka-link-regexp (&optional match-entire)
